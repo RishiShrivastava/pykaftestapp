@@ -1,0 +1,4 @@
+1.1.0 - Added end-to-end testing capabilities
+- Added comprehensive e2e_test.py script
+- Enhanced test reporting with detailed logs
+- Updated documentation with testing procedures
