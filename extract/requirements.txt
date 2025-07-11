@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+confluent-kafka
+python-dotenv
+pydantic

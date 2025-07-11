@@ -1,0 +1,202 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: etl-secrets
+type: Opaque
+data:
+  POSTGRES_USER: ZXRsdXNlcg==  # base64 encoded 'etluser'
+  POSTGRES_PASSWORD: ZXRscGFzcw==  # base64 encoded 'etlpass'
+  POSTGRES_DB: ZXRsZGI=  # base64 encoded 'etldb'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etl-config
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+  POSTGRES_HOST: "192.168.0.190"
+  POSTGRES_PORT: "5432"
+  POSTGRES_SSL_MODE: "prefer"
+  DB_POOL_SIZE: "20"
+  DB_POOL_OVERFLOW: "10"
+  DB_POOL_TIMEOUT: "30"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extract-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: extract-service
+  template:
+    metadata:
+      labels:
+        app: extract-service
+    spec:
+      containers:
+      - name: extract
+        image: your-registry.com/etl-extract:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: etl-config
+        - secretRef:
+            name: etl-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transform-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: transform-service
+  template:
+    metadata:
+      labels:
+        app: transform-service
+    spec:
+      containers:
+      - name: transform
+        image: your-registry.com/etl-transform:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: etl-config
+        - secretRef:
+            name: etl-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: load-service
+  template:
+    metadata:
+      labels:
+        app: load-service
+    spec:
+      containers:
+      - name: load
+        image: your-registry.com/etl-load:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: etl-config
+        - secretRef:
+            name: etl-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: extract-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: extract-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transform-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: transform-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: load-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: load-service
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: etl-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: etl.your-domain.com
+    http:
+      paths:
+      - path: /extract
+        pathType: Prefix
+        backend:
+          service:
+            name: extract-service
+            port:
+              number: 8000
+      - path: /transform
+        pathType: Prefix
+        backend:
+          service:
+            name: transform-service
+            port:
+              number: 8000
+      - path: /load
+        pathType: Prefix
+        backend:
+          service:
+            name: load-service
+            port:
+              number: 8000
