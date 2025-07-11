@@ -31,7 +31,7 @@ app = FastAPI()
 DB_CONFIG = {
     'dbname': os.getenv('DB_NAME', 'etldb'),
     'user': os.getenv('DB_USER', 'etluser'),
-    'password': os.getenv('DB_PASSWORD', 'etlpass'),
+    'password': os.getenv('DB_PASSWORD'),  # No default, must be set at runtime
     'host': os.getenv('DB_HOST', 'db'),
     'port': os.getenv('DB_PORT', '5432'),
     'sslmode': os.getenv('POSTGRES_SSL_MODE', 'require'),

@@ -31,7 +31,7 @@ services:
       # Add persistence configurations
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
-      - kafka_data:/var/lib/kafka/data
+      - kafka_data:/var/lib/kafka/data      sudo netstat -plnt | grep postgres
       - kafka_logs:/var/log/kafka
     restart: unless-stopped
 
@@ -49,9 +49,7 @@ services:
     restart: unless-stopped
 
   extract:
-    # build: ./extract  # Commented out: Use pre-built image instead
-    image: etl-extract:latest  # Using locally built image with remote DB config
-    # image: your-dockerhub-username/etl-extract:remote-db-v1.0.0  # Uncomment for Docker Hub
+    image: rishi354/etl-extract:1.0.0
     container_name: etl_extract
     depends_on:
       - kafka
@@ -69,9 +67,8 @@ services:
       retries: 3
 
   transform:
-    # build: ./transform  # Commented out: Use pre-built image instead
-    image: etl-transform:latest  # Using locally built image with remote DB config
-    # image: your-dockerhub-username/etl-transform:remote-db-v1.0.0  # Uncomment for Docker Hub
+    build: ./transform
+    image: etl-transform:1.0.0  # Version for testing
     container_name: etl_transform
     depends_on:
       - kafka
@@ -89,9 +86,8 @@ services:
       retries: 3
 
   load:
-    # build: ./load  # Commented out: Use pre-built image instead
-    image: etl-load:latest  # Using locally built image with remote DB config
-    # image: your-dockerhub-username/etl-load:remote-db-v1.0.0  # Uncomment for Docker Hub
+    build: ./load
+    image: etl-load:1.0.0  # Version for testing
     container_name: etl_load
     depends_on:
       - kafka

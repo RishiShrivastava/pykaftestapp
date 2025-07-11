@@ -1,0 +1,6 @@
+# Exclude secrets and sensitive files
+.env
+*.env
+*.pem
+*.key
+secrets/

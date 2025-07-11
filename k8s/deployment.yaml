@@ -37,7 +37,9 @@ spec:
     spec:
       containers:
       - name: extract
-        image: your-registry.com/etl-extract:latest
+        image: rishishrivastava/etl-extract:latest
+        # Alternative: rishishrivastava/etl-extract:remote-db-v1.0.0
+        # Alternative: your-registry.com/etl-extract:latest
         ports:
         - containerPort: 8000
         envFrom:
@@ -74,7 +76,9 @@ spec:
     spec:
       containers:
       - name: transform
-        image: your-registry.com/etl-transform:latest
+        image: rishishrivastava/etl-transform:latest
+        # Alternative: rishishrivastava/etl-transform:remote-db-v1.0.0
+        # Alternative: your-registry.com/etl-transform:latest
         ports:
         - containerPort: 8000
         envFrom:
@@ -111,7 +115,9 @@ spec:
     spec:
       containers:
       - name: load
-        image: your-registry.com/etl-load:latest
+        image: rishishrivastava/etl-load:latest
+        # Alternative: rishishrivastava/etl-load:remote-db-v1.0.0
+        # Alternative: your-registry.com/etl-load:latest
         ports:
         - containerPort: 8000
         envFrom:
