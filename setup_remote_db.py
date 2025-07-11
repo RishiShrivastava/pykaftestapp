@@ -8,21 +8,30 @@ import psycopg2
 import sys
 import os
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Get database configuration from environment variables
+DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+DB_PORT = int(os.getenv('DB_PORT', '5432'))
+DB_USER = os.getenv('DB_USER', 'etluser')
+DB_NAME = os.getenv('DB_NAME', 'etldb')
 
 def create_database_and_user():
     """Create the database and user on the remote PostgreSQL instance."""
     
     # Connection parameters for the remote database
-    host = "192.168.0.190"
-    port = 5432
-    admin_user = "postgres"  # Default admin user
+    admin_user = os.getenv('POSTGRES_ADMIN_USER', 'postgres')  # Default admin user
     admin_password = input("Enter PostgreSQL admin password: ")
+    new_user_password = input("Enter password for new etluser: ")
     
     try:
         # Connect as admin to create database and user
         conn = psycopg2.connect(
-            host=host,
-            port=port,
+            host=DB_HOST,
+            port=DB_PORT,
             user=admin_user,
             password=admin_password,
             database="postgres"  # Connect to default database
@@ -35,7 +44,7 @@ def create_database_and_user():
             DO $$ 
             BEGIN
                 IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'etluser') THEN
-                    CREATE USER etluser WITH PASSWORD 'etlpass';
+                    CREATE USER etluser WITH PASSWORD %s;
                 END IF;
             END $$;
         """)
@@ -70,11 +79,11 @@ def create_schema():
     try:
         # Connect to the etldb database as etluser
         conn = psycopg2.connect(
-            host="192.168.0.190",
-            port=5432,
-            user="etluser",
-            password="etlpass",
-            database="etldb"
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=os.getenv('DB_PASSWORD'),
+            database=DB_NAME
         )
         
         cursor = conn.cursor()
@@ -121,11 +130,11 @@ def test_connection():
     
     try:
         conn = psycopg2.connect(
-            host="192.168.0.190",
-            port=5432,
-            user="etluser",
-            password="etlpass",
-            database="etldb"
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=os.getenv('DB_PASSWORD'),
+            database=DB_NAME
         )
         
         cursor = conn.cursor()
