@@ -16,8 +16,9 @@ import ssl
 load_dotenv()
 
 # Set up logging to file
-os.makedirs('/app/logs', exist_ok=True)
-file_handler = RotatingFileHandler('/app/logs/load.log', maxBytes=10485760, backupCount=5)
+log_dir = os.getenv('LOG_DIR', '/app/logs')
+os.makedirs(log_dir, exist_ok=True)
+file_handler = RotatingFileHandler(f'{log_dir}/load.log', maxBytes=10485760, backupCount=5)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -25,13 +26,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def validate_required_env_vars():
+    """Validate that required environment variables are set."""
+    required_vars = ['DB_USER', 'DB_PASSWORD']
+    missing_vars = []
+    
+    for var in required_vars:
+        if not os.getenv(var):
+            missing_vars.append(var)
+    
+    if missing_vars:
+        error_msg = f"Missing required environment variables: {', '.join(missing_vars)}. " \
+                   f"These variables must be set for security reasons and cannot use default values."
+        logger.error(error_msg)
+        raise SystemExit(f"SECURITY ERROR: {error_msg}")
+    
+    logger.info("Database security validation passed - all required environment variables are set")
+
+# Validate required environment variables before proceeding
+validate_required_env_vars()
+
 app = FastAPI()
 
 # Database configuration with SSL
 DB_CONFIG = {
     'dbname': os.getenv('DB_NAME', 'etldb'),
-    'user': os.getenv('DB_USER', 'etluser'),
-    'password': os.getenv('DB_PASSWORD', 'etlpass'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
     'host': os.getenv('DB_HOST', 'db'),
     'port': os.getenv('DB_PORT', '5432'),
     'sslmode': os.getenv('POSTGRES_SSL_MODE', 'require'),

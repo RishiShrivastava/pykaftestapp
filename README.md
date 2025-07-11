@@ -63,6 +63,23 @@ KAFKA_UI_PORT=8080
 KAFKA_UI_CLUSTER_NAME=local
 ```
 
+### Security Requirements
+
+**⚠️ IMPORTANT SECURITY NOTICE:**
+
+The following environment variables are **REQUIRED** and **MUST** be set for the application to start:
+
+- `DB_USER` (or `POSTGRES_USER`): Database username
+- `DB_PASSWORD` (or `POSTGRES_PASSWORD`): Database password
+
+These variables have **NO DEFAULT VALUES** for security reasons. The application will refuse to start if these are not explicitly set in your environment.
+
+**Security Best Practices:**
+- Never use weak or default credentials in production
+- Use strong, unique passwords for database connections
+- Store sensitive credentials securely using environment variables or secrets management systems
+- Never commit credentials to version control
+
 ## Services
 
 ### Extract Service (Port: 8001)
@@ -106,7 +123,7 @@ KAFKA_UI_CLUSTER_NAME=local
 ## Getting Started
 
 1. Clone the repository
-2. Create `.env` file with required variables
+2. Create `.env` file with required variables (**⚠️ Must include DB_USER and DB_PASSWORD - see Security Requirements above**)
 3. Start the services:
    ```bash
    docker compose up -d
@@ -116,6 +133,8 @@ KAFKA_UI_CLUSTER_NAME=local
    - Transform API: http://localhost:8002
    - Load API: http://localhost:8003
    - Kafka UI: http://localhost:8080
+
+**Note:** The Load service will fail to start if `DB_USER` and `DB_PASSWORD` environment variables are not set.
 
 ## API Endpoints
 
