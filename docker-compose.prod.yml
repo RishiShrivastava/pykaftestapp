@@ -1,4 +1,5 @@
 # Production Docker Compose configuration using pre-built images from Docker Hub
+version: '3.8'
 
 services:
   kafka:
@@ -28,6 +29,24 @@ services:
       - kafka_data:/var/lib/kafka/data
       - kafka_logs:/var/log/kafka
     restart: unless-stopped
+    networks:
+      - etl-network
+
+  nginx-waf:
+    image: owasp/modsecurity:nginx
+    container_name: nginx_waf
+    depends_on:
+      - extract
+      - transform
+      - load
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-waf.conf:/etc/nginx/conf.d/etl-services.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - etl-network
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -35,15 +54,16 @@ services:
     depends_on:
       - kafka
     ports:
-      - "${KAFKA_UI_PORT}:8080"
+      - "${KAFKA_UI_PORT:-8080}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: ${KAFKA_UI_CLUSTER_NAME}
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-      SERVER_PORT: ${KAFKA_UI_PORT}
     restart: unless-stopped
+    networks:
+      - etl-network
 
   extract:
-    image: rishi354/etl-extract:1.1.0
+    image: rishi354/etl-extract:1.0.0
     container_name: etl_extract
     depends_on:
       - kafka
@@ -51,17 +71,13 @@ services:
       - KAFKA_BROKER=${KAFKA_BOOTSTRAP_SERVERS}
     volumes:
       - extract_logs:/app/logs
-    ports:
-      - "8001:8000"
+    # No external ports exposed; routed via nginx-waf
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - etl-network
 
   transform:
-    image: rishi354/etl-transform:1.1.0
+    image: rishi354/etl-transform:1.0.0
     container_name: etl_transform
     depends_on:
       - kafka
@@ -69,17 +85,13 @@ services:
       - KAFKA_BROKER=${KAFKA_BOOTSTRAP_SERVERS}
     volumes:
       - transform_logs:/app/logs
-    ports:
-      - "8002:8000"
+    # No external ports exposed; routed via nginx-waf
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - etl-network
 
   load:
-    image: rishi354/etl-load:1.1.0
+    image: rishi354/etl-load:1.0.0
     container_name: etl_load
     depends_on:
       - kafka
@@ -96,14 +108,10 @@ services:
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
     volumes:
       - load_logs:/app/logs
-    ports:
-      - "8003:8000"
+    # No external ports exposed; routed via nginx-waf
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - etl-network
 
 volumes:
   kafka_data:
@@ -116,3 +124,8 @@ volumes:
     name: etl_transform_logs
   load_logs:
     name: etl_load_logs
+
+networks:
+  etl-network:
+    driver: bridge
+    name: etl_prod_network
