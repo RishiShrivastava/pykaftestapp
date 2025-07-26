@@ -4,3 +4,4 @@ confluent-kafka
 python-dotenv
 pydantic
 psycopg2-binary
+asyncpg

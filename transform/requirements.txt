@@ -3,3 +3,6 @@ uvicorn[standard]
 confluent-kafka
 python-dotenv
 pydantic
+aiohttp
+user-agents
+geoip2

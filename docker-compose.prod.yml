@@ -1,10 +1,10 @@
 # Production Docker Compose configuration using pre-built images from Docker Hub
-version: '3.8'
 
 services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: etl_kafka
+    # Persistent storage: Kafka data and logs are persisted via volumes
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -33,24 +33,36 @@ services:
       - etl-network
 
   nginx-waf:
-    image: owasp/modsecurity:nginx
+    image: owasp/modsecurity-crs:nginx
     container_name: nginx_waf
     depends_on:
       - extract
       - transform
       - load
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:8080"
+      - "443:8443"
     volumes:
-      - ./nginx-waf.conf:/etc/nginx/conf.d/etl-services.conf:ro
       - ./certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    environment:
+      - MODSEC_RULE_ENGINE=On
+      - SSL_PORT=8443
+      - BACKEND=http://enhanced-extract-service:8000
+      - SSL_CERT=/etc/nginx/certs/cert.pem
+      - SSL_CERT_KEY=/etc/nginx/certs/key.pem
+      - PARANOIA=1
+      - BLOCKING_PARANOIA=1
+      # Force HTTP to HTTPS redirection
+      - ALWAYS_REDIRECT=on
+      - REDIRECT_TARGET=https://$host$request_uri
     networks:
       - etl-network
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: etl_kafka_ui
+    # Persistent UI configuration and session data
     depends_on:
       - kafka
     ports:
@@ -58,41 +70,57 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: ${KAFKA_UI_CLUSTER_NAME}
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+    volumes:
+      # Persistent storage for Kafka UI configuration and logs
+      - kafka_ui_data:/app/data
+      - kafka_ui_logs:/app/logs
     restart: unless-stopped
     networks:
       - etl-network
 
   extract:
-    image: rishi354/etl-extract:1.0.0
-    container_name: etl_extract
+    build: ./extract
+    container_name: enhanced-extract-service
+    environment:
+      KAFKA_BROKER: kafka:29092
+    # Commented out direct port exposure to enforce HTTPS-only access through WAF
+    # ports:
+    #   - "8000:8000"
     depends_on:
       - kafka
-    environment:
-      - KAFKA_BROKER=${KAFKA_BOOTSTRAP_SERVERS}
     volumes:
+      - ./extract:/app
+      - extract_uploads:/app/data/uploads
       - extract_logs:/app/logs
-    # No external ports exposed; routed via nginx-waf
-    restart: unless-stopped
     networks:
       - etl-network
+    command: python main_enhanced.py
 
   transform:
-    image: rishi354/etl-transform:1.0.0
-    container_name: etl_transform
+    build: ./transform
+    container_name: enhanced-transform-service
+    # Persistent logs and transformation data storage
     depends_on:
       - kafka
     environment:
       - KAFKA_BROKER=${KAFKA_BOOTSTRAP_SERVERS}
     volumes:
+      - ./transform:/app
       - transform_logs:/app/logs
+      # Additional persistent storage for transformation data and cache
+      - transform_data:/app/data
+      - transform_cache:/app/cache
+      - geoip_data:/app/data/geoip
     # No external ports exposed; routed via nginx-waf
     restart: unless-stopped
     networks:
       - etl-network
+    command: python main_enhanced.py
 
   load:
-    image: rishi354/etl-load:1.0.0
-    container_name: etl_load
+    build: ./load
+    container_name: enhanced-load-service
+    # Persistent logs and load operation data storage
     depends_on:
       - kafka
     environment:
@@ -106,26 +134,70 @@ services:
       - DB_POOL_SIZE=${DB_POOL_SIZE}
       - DB_POOL_OVERFLOW=${DB_POOL_OVERFLOW}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
+      - BATCH_SIZE=1000
+      - BATCH_TIMEOUT=30
+      - ANALYTICS_INTERVAL=300
     volumes:
+      - ./load:/app
       - load_logs:/app/logs
+      # Additional persistent storage for load data and database connection state
+      - load_data:/app/data
+      - load_backup:/app/backup
     # No external ports exposed; routed via nginx-waf
     restart: unless-stopped
     networks:
       - etl-network
+    command: python main_enhanced.py
 
 volumes:
+  # Kafka persistence volumes
   kafka_data:
     name: etl_kafka_data
   kafka_logs:
     name: etl_kafka_logs
+  
+  # NGINX WAF persistence volumes
+  nginx_logs:
+    name: etl_nginx_logs
+  nginx_cache:
+    name: etl_nginx_cache
+  
+  # Kafka UI persistence volumes
+  kafka_ui_data:
+    name: etl_kafka_ui_data
+  kafka_ui_logs:
+    name: etl_kafka_ui_logs
+  
+  # Extract service persistence volumes
   extract_logs:
     name: etl_extract_logs
+  extract_uploads:
+    name: etl_extract_uploads
+  extract_data:
+    name: etl_extract_data
+  extract_temp:
+    name: etl_extract_temp
+  
+  # Transform service persistence volumes
   transform_logs:
     name: etl_transform_logs
+  transform_data:
+    name: etl_transform_data
+  transform_cache:
+    name: etl_transform_cache
+  geoip_data:
+    name: etl_geoip_data
+  
+  # Load service persistence volumes
   load_logs:
     name: etl_load_logs
+  load_data:
+    name: etl_load_data
+  load_backup:
+    name: etl_load_backup
 
 networks:
   etl-network:
     driver: bridge
     name: etl_prod_network
+    # Persistent network configuration for service isolation and communication

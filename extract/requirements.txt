@@ -3,3 +3,6 @@ uvicorn[standard]
 confluent-kafka
 python-dotenv
 pydantic
+aiofiles
+python-multipart
+jinja2

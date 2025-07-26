@@ -1,0 +1,30 @@
+donot delete anything only comment and append -- this gives better tracking
+all files and code to be added with my name
+every days work to be tracked and logged here
+
+--- July 27, 2025 (Rishi) ---
+1. Enhanced security by forcing HTTPS-only access:
+   - Modified docker-compose.prod.yml to comment out direct port exposure for extract service
+   - Configured NGINX WAF to handle all traffic and enforce HTTPS
+   - Added HTTP to HTTPS redirection in nginx-waf.conf
+   - Added REDIRECT_TARGET environment variable to ensure proper redirection
+
+2. Fixed WAF configuration to properly communicate with backend services:
+   - Updated proxy_backend.conf to use HTTP for internal communication
+   - Used setup_waf.sh script to apply configuration changes
+
+3. Validated security enhancements:
+   - Confirmed services are only accessible through WAF (port 443)
+   - Tested HTTPS endpoint functionality (/health endpoint)
+   - Created verify-https.sh script to test security configuration
+
+4. Verification results:
+   - ✅ HTTPS access is working properly
+   - ✅ Direct access to extract service is blocked (port 8000 no longer exposed)
+   - ⚠️ HTTP access works but doesn't redirect to HTTPS yet (needs fixing)
+
+5. Known issues/To-do:
+   - Fix HTTP to HTTPS redirection in WAF configuration
+   - Implement HTTP Strict Transport Security (HSTS)
+   - Review WAF rules for possible customization
+

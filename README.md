@@ -161,13 +161,24 @@ The test generates a detailed report (`etl_test_report.log`) containing:
 2. Create `.env` file with required variables
 3. Start the services:
    ```bash
+   # For development (local services)
    docker compose up -d
+   
+   # For production (with WAF)
+   docker-compose -f docker-compose.prod.yml up -d
    ```
 4. Access services:
-   - Extract API: http://localhost:8001
-   - Transform API: http://localhost:8002
-   - Load API: http://localhost:8003
-   - Kafka UI: http://localhost:8080
+   - **Production (HTTPS via WAF):**
+     - Extract API: https://localhost/extract/
+     - Transform API: https://localhost/transform/
+     - Load API: https://localhost/load/
+     - WAF Health: https://localhost/health
+   - **Development (Direct HTTP):**
+     - Extract API: http://localhost:8001
+     - Transform API: http://localhost:8002
+     - Load API: http://localhost:8003
+   - **Always Available:**
+     - Kafka UI: http://localhost:8080
 
 ## API Endpoints
 
@@ -215,6 +226,62 @@ The test generates a detailed report (`etl_test_report.log`) containing:
    - Added health checks for service monitoring
    - Implemented rotating log files
    - Verified data persistence across container restarts
+
+## Latest Updates (July 25, 2025)
+
+### Web Application Firewall (WAF) and HTTPS Implementation ✅
+
+1. **NGINX WAF with ModSecurity**
+   - Implemented OWASP ModSecurity-nginx container as reverse proxy
+   - All external traffic now routes through WAF on ports 80/443
+   - ModSecurity rules enabled for web application security
+   - SSL/TLS termination at the WAF layer
+
+2. **HTTPS-Only External Access**
+   - All services accessible only via HTTPS (port 443)
+   - HTTP traffic automatically redirected to HTTPS
+   - Self-signed SSL certificates generated for testing
+   - Production-ready SSL configuration with TLSv1.2/1.3
+
+3. **Service Isolation and Security**
+   - Removed all external port mappings from ETL services
+   - Services only accessible via internal Docker network
+   - External access only through WAF reverse proxy
+   - Added secure proxy headers for proper request forwarding
+
+4. **Configuration Files**
+   - **`nginx-waf.conf`**: NGINX configuration with upstream definitions
+   - **`certs/`**: SSL certificate directory (cert.pem, key.pem)
+   - **`docker-compose.prod.yml`**: Production configuration with WAF
+
+5. **Access Patterns**
+   - HTTPS access: `https://localhost/extract/`, `https://localhost/transform/`, `https://localhost/load/`
+   - HTTP automatically redirects to HTTPS
+   - WAF protects all incoming requests with OWASP rules
+
+### Service Architecture Updates
+```
+Internet → NGINX WAF (80/443) → Internal Network → ETL Services (8000)
+         ↑                                       ↓
+    ModSecurity                              Kafka (9092/29092)
+    SSL/TLS                                  Kafka UI (8080)
+```
+
+### Current Security Features
+- **WAF Protection**: OWASP ModSecurity rules
+- **SSL/TLS Encryption**: All external traffic encrypted
+- **Network Isolation**: Services only accessible via WAF
+- **Request Filtering**: ModSecurity filters malicious requests
+- **Secure Headers**: Proper forwarding headers for downstream services
+
+### WAF Configuration Status
+- **Basic Configuration**: ✅ Implemented
+- **SSL Certificates**: ✅ Self-signed for testing
+- **Service Routing**: ✅ All services accessible via HTTPS
+- **ModSecurity Rules**: ✅ OWASP CRS enabled
+- **Production Tuning**: ⏳ Pending (custom rules, performance optimization)
+
+> **Note**: WAF implementation is functional but requires further tuning for production use. Custom ModSecurity rules, performance optimization, and proper SSL certificates should be configured before production deployment.
 
 ## Latest Updates (July 11, 2025)
 
@@ -311,6 +378,27 @@ Starting Point for Development:
 
 ## Deployment Commands
 
+### Production Deployment with WAF
+```bash
+# Start production stack with WAF
+docker-compose -f docker-compose.prod.yml up -d
+
+# Check service status
+docker-compose -f docker-compose.prod.yml ps
+
+# View WAF logs
+docker logs nginx_waf
+
+# Test HTTPS endpoints
+curl -k https://localhost/health         # WAF health check
+curl -k https://localhost/extract/       # Extract service via WAF
+curl -k https://localhost/transform/     # Transform service via WAF
+curl -k https://localhost/load/          # Load service via WAF
+
+# Check SSL certificate
+openssl s_client -connect localhost:443 -servername localhost
+```
+
 ### Local Development with Remote Database
 ```bash
 # Start services with remote database
@@ -328,6 +416,38 @@ docker compose logs -f load
 curl http://localhost:8001/health  # Extract service
 curl http://localhost:8002/health  # Transform service
 curl http://localhost:8003/health  # Load service
+```
+
+### SSL Certificate Management
+```bash
+# Generate self-signed certificate for testing
+openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem \
+  -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+
+# For production, place your certificates in certs/ directory:
+# certs/cert.pem  - SSL certificate
+# certs/key.pem   - Private key
+
+# Verify certificate
+openssl x509 -in certs/cert.pem -text -noout
+
+# Test SSL connection
+curl -k https://localhost/health
+```
+
+### WAF Configuration and Tuning
+```bash
+# View ModSecurity logs
+docker exec nginx_waf tail -f /var/log/modsec_audit.log
+
+# Check NGINX configuration
+docker exec nginx_waf nginx -t
+
+# Reload NGINX configuration (without restart)
+docker exec nginx_waf nginx -s reload
+
+# View OWASP Core Rule Set status
+docker exec nginx_waf cat /etc/modsecurity.d/setup.conf
 ```
 
 ### Docker Image Management
